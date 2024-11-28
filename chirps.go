@@ -92,3 +92,10 @@ func (cfg *apiConfig) resetChirpDB(w http.ResponseWriter, req *http.Request) {
 	w.Write([]byte("Chirps removed from database"))
 
 }
+
+
+func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Body   string    `json:"body"`
+		UserID uuid.UUID `json:"user_id"`
+	}

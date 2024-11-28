@@ -43,6 +43,8 @@ func main() {
 
 	mux.HandleFunc("POST /api/chirps", apiCfg.createChirp)
 
+	mux.HandleFunc("GET /api/chirps", apiCfg.getAllChirps)
+
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(
 		http.StripPrefix(
 			"/app", http.FileServer(
