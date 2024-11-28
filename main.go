@@ -1,12 +1,27 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"log"
 	"net/http"
+	"os"
 	"time"
+
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
+	"github.com/romusking/chirpy/internal/database"
 )
 
 func main() {
+	godotenv.Load()
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Printf("Error connecting to database: %s", err)
+	}
+	dbQueries := database.New(db)
+	dbQueries.CreateUser(context.TODO(), sql.NullString{"romus@duck.com", true})
 	mux := http.NewServeMux()
 	s := &http.Server{
 		Addr:           ":8080",
@@ -24,6 +39,8 @@ func main() {
 	mux.HandleFunc("POST /admin/reset", apiCfg.middlewareMetricsRst)
 
 	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
+
+	mux.HandleFunc("POST /api/users", handlerChirpsValidate)
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(
 		http.StripPrefix(
