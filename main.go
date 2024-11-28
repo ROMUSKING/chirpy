@@ -39,9 +39,11 @@ func main() {
 
 	mux.HandleFunc("POST /api/reset", apiCfg.middlewareMetricsRst)
 
-	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
+	//mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
 
 	mux.HandleFunc("POST /api/users", apiCfg.createUser)
+
+	mux.HandleFunc("POST /api/chirps", apiCfg.createChirp)
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(
 		http.StripPrefix(

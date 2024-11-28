@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-	"strings"
 )
 
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
@@ -31,24 +30,4 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 	restpondWithJSON(w, http.StatusOK, returnVals{
 		CleanedBody: filterProfane(params.Body),
 	})
-}
-
-func filterProfane(msg string) string {
-	profanities := []string{
-		"kerfuffle",
-		"sharbert",
-		"fornax",
-	}
-	words := strings.Split(msg, " ")
-
-	for i, word := range words {
-		for _, profane := range profanities {
-			if profane == strings.ToLower(word) {
-				words[i] = "****"
-			}
-		}
-
-	}
-	return strings.Join(words, " ")
-
 }
