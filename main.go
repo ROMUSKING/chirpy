@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -20,27 +18,30 @@ func main() {
 	if err != nil {
 		log.Printf("Error connecting to database: %s", err)
 	}
-	dbQueries := database.New(db)
-	dbQueries.CreateUser(context.TODO(), sql.NullString{"romus@duck.com", true})
+	platform := os.Getenv("PLATFORM")
+
 	mux := http.NewServeMux()
 	s := &http.Server{
 		Addr:           ":8080",
 		Handler:        mux,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	apiCfg := apiConfig{}
+	apiCfg := apiConfig{
+		db:       database.New(db),
+		platform: platform,
+	}
 
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 
 	mux.HandleFunc("GET /admin/metrics", apiCfg.middlewareMetricsDsp)
 
-	mux.HandleFunc("POST /admin/reset", apiCfg.middlewareMetricsRst)
+	mux.HandleFunc("POST /admin/reset", apiCfg.resetUserDB)
+
+	mux.HandleFunc("POST /api/reset", apiCfg.middlewareMetricsRst)
 
 	mux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
 
-	mux.HandleFunc("POST /api/users", handlerChirpsValidate)
+	mux.HandleFunc("POST /api/users", apiCfg.createUser)
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(
 		http.StripPrefix(
