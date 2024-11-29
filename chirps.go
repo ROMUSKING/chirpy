@@ -46,13 +46,7 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp, database error.", err)
 		return
 	}
-	chirp := Chirp{
-		ID:        chirpDB.ID,
-		CreatedAt: chirpDB.CreatedAt,
-		UpdatedAt: chirpDB.UpdatedAt,
-		Body:      chirpDB.Body,
-		UserID:    chirpDB.UserID,
-	}
+	chirp := dBToChirpJSON(chirpDB)
 	restpondWithJSON(w, 201, chirp)
 
 }
@@ -93,9 +87,28 @@ func (cfg *apiConfig) resetChirpDB(w http.ResponseWriter, req *http.Request) {
 
 }
 
-
 func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
-	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+
+	chirpsInDB, err := cfg.db.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirp, database error.", err)
+		return
 	}
+	chirps := make([]Chirp, len(chirpsInDB))
+	for i, chirpDB := range chirpsInDB {
+		chirps[i] = dBToChirpJSON(chirpDB)
+
+	}
+	restpondWithJSON(w, 200, chirps)
+}
+
+func dBToChirpJSON(chirpDB database.Chirp) Chirp {
+	chirp := Chirp{
+		ID:        chirpDB.ID,
+		CreatedAt: chirpDB.CreatedAt,
+		UpdatedAt: chirpDB.UpdatedAt,
+		Body:      chirpDB.Body,
+		UserID:    chirpDB.UserID,
+	}
+	return chirp
+}
