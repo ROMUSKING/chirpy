@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/romusking/chirpy/internal/auth"
 	"github.com/romusking/chirpy/internal/database"
 )
 
@@ -19,14 +20,27 @@ type Chirp struct {
 }
 
 func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "no auth token in request", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token in request", err)
+		return
+	}
+
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Can't create chirp, invalid message.", err)
 		return
@@ -41,12 +55,12 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 	chirpDB, err := cfg.db.CreateChirp(
 		r.Context(), database.CreateChirpParams{
 			Body:   params.Body,
-			UserID: params.UserID})
+			UserID: userID})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp, database error.", err)
 		return
 	}
-	chirp := dBToChirpJSON(chirpDB)
+	chirp := chirpDBToChirpJSON(chirpDB)
 	restpondWithJSON(w, 201, chirp)
 
 }
@@ -71,22 +85,6 @@ func filterProfane(msg string) string {
 
 }
 
-func (cfg *apiConfig) resetChirpDB(w http.ResponseWriter, req *http.Request) {
-	if cfg.platform != "dev" {
-		respondWithError(w, http.StatusForbidden, "Can't remove all chirps", nil)
-	}
-	err := cfg.db.DeleteAllChirps(req.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Can't delete chirps, database error.", err)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Chirps removed from database"))
-
-}
-
 func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 
 	chirpsInDB, err := cfg.db.GetAllChirps(r.Context())
@@ -96,13 +94,13 @@ func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 	}
 	chirps := make([]Chirp, len(chirpsInDB))
 	for i, chirpDB := range chirpsInDB {
-		chirps[i] = dBToChirpJSON(chirpDB)
+		chirps[i] = chirpDBToChirpJSON(chirpDB)
 
 	}
 	restpondWithJSON(w, 200, chirps)
 }
 
-func dBToChirpJSON(chirpDB database.Chirp) Chirp {
+func chirpDBToChirpJSON(chirpDB database.Chirp) Chirp {
 	chirp := Chirp{
 		ID:        chirpDB.ID,
 		CreatedAt: chirpDB.CreatedAt,

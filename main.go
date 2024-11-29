@@ -20,6 +20,8 @@ func main() {
 	}
 	platform := os.Getenv("PLATFORM")
 
+	secret := os.Getenv("SECRET")
+
 	mux := http.NewServeMux()
 	s := &http.Server{
 		Addr:           ":8080",
@@ -29,6 +31,7 @@ func main() {
 	apiCfg := apiConfig{
 		db:       database.New(db),
 		platform: platform,
+		secret:   secret,
 	}
 
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
@@ -40,6 +43,8 @@ func main() {
 	mux.HandleFunc("POST /api/reset", apiCfg.middlewareMetricsRst)
 
 	mux.HandleFunc("POST /api/users", apiCfg.createUser)
+
+	mux.HandleFunc("POST /api/login", apiCfg.loginUser)
 
 	mux.HandleFunc("POST /api/chirps", apiCfg.createChirp)
 
