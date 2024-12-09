@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -105,7 +104,6 @@ func (cfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	if params.ExpiresInSeconds > defaultExpiration || params.ExpiresInSeconds == 0 {
 		params.ExpiresInSeconds = defaultExpiration
 	}
-	fmt.Println(time.Duration(params.ExpiresInSeconds * 1000000000))
 	token, err := auth.MakeJWT(
 		userDB.ID,
 		cfg.secret,
