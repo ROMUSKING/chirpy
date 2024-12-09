@@ -110,3 +110,22 @@ func chirpDBToChirpJSON(chirpDB database.Chirp) Chirp {
 	}
 	return chirp
 }
+
+func (cfg *apiConfig) getOneChirp(w http.ResponseWriter, r *http.Request) {
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't get chirp, wrong UUID.", err)
+		return
+	}
+
+	chirpInDB, err := cfg.db.GetOneChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't get chirp, wrong UUID.", err)
+		return
+	}
+	chirp := chirpDBToChirpJSON(chirpInDB)
+
+	restpondWithJSON(w, 200, chirp)
+}

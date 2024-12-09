@@ -11,11 +11,12 @@ import (
 )
 
 type User struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Email     string    `json:"email"`
-	Token     string    `json:"token"`
+	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+	Email        string    `json:"email"`
+	Token        string    `json:"token"`
+	RefreshToken string    `json:"refresh_token"`
 }
 
 func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
@@ -76,9 +77,8 @@ func (cfg *apiConfig) resetUserDB(w http.ResponseWriter, req *http.Request) {
 func (cfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -100,14 +100,31 @@ func (cfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password.", err)
 		return
 	}
-	const defaultExpiration int = 3600
-	if params.ExpiresInSeconds > defaultExpiration || params.ExpiresInSeconds == 0 {
-		params.ExpiresInSeconds = defaultExpiration
-	}
+	const hour int = 3600 * 1000000000
+	const exp int = hour * 24 * 60
+
 	token, err := auth.MakeJWT(
 		userDB.ID,
 		cfg.secret,
-		time.Duration(params.ExpiresInSeconds*1000000000))
+		time.Duration(hour))
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't create token.", err)
+		return
+	}
+
+	refreshToken, err := auth.MakeRefreshToken()
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't create token.", err)
+		return
+	}
+
+	_, err = cfg.db.CreateRefToken(r.Context(),
+		database.CreateRefTokenParams{
+			Token:     refreshToken,
+			UserID:    userDB.ID,
+			ExpiresAt: time.Now().Add(time.Duration(exp))})
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Can't create token.", err)
@@ -115,12 +132,70 @@ func (cfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := User{
-		ID:        userDB.ID,
-		CreatedAt: userDB.CreatedAt,
-		UpdatedAt: userDB.UpdatedAt,
-		Email:     userDB.Email,
-		Token:     token,
+		ID:           userDB.ID,
+		CreatedAt:    userDB.CreatedAt,
+		UpdatedAt:    userDB.UpdatedAt,
+		Email:        userDB.Email,
+		Token:        token,
+		RefreshToken: refreshToken,
 	}
 	restpondWithJSON(w, http.StatusOK, user)
 
+}
+
+func (cfg *apiConfig) refreshToken(w http.ResponseWriter, r *http.Request) {
+
+	type parameters struct {
+		Token string `json:"token"`
+	}
+
+	refreshToken, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid token", err)
+		return
+	}
+
+	tokenDB, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshToken)
+
+	if err != nil || tokenDB.RevokedAt.Valid || time.Now().After(tokenDB.ExpiresAt) {
+		respondWithError(w, http.StatusUnauthorized, "invalid token", err)
+		return
+	}
+
+	const hour int = 3600 * 1000000000
+
+	token, err := auth.MakeJWT(
+		tokenDB.UserID,
+		cfg.secret,
+		time.Duration(hour))
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Can't create token.", err)
+		return
+	}
+
+	params := parameters{Token: token}
+
+	restpondWithJSON(w, http.StatusOK, params)
+
+}
+
+func (cfg *apiConfig) revokeRefreshToken(w http.ResponseWriter, r *http.Request) {
+
+	refreshToken, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "invalid token", err)
+		return
+	}
+
+	_, err = cfg.db.RevokeRefreshToken(r.Context(), refreshToken)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldn't revoke token", err)
+		return
+	}
+
+	restpondWithJSON(w, http.StatusNoContent, "")
 }
