@@ -199,3 +199,58 @@ func (cfg *apiConfig) revokeRefreshToken(w http.ResponseWriter, r *http.Request)
 
 	restpondWithJSON(w, http.StatusNoContent, "")
 }
+
+func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "no auth token in request", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token in request", err)
+		return
+	}
+
+	type parameters struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err = decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Can't update user, invalid email or password.", err)
+		return
+	}
+
+	hashed, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Cant use password.", err)
+		return
+	}
+
+	userDB, err := cfg.db.UpdateUserDetails(
+		r.Context(),
+		database.UpdateUserDetailsParams{
+			ID:             userID,
+			Email:          params.Email,
+			HashedPassword: hashed})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't update user, database error.", err)
+		return
+	}
+	user := User{
+		ID:        userDB.ID,
+		CreatedAt: userDB.CreatedAt,
+		UpdatedAt: userDB.UpdatedAt,
+		Email:     userDB.Email,
+	}
+	restpondWithJSON(w, http.StatusOK, user)
+
+}
