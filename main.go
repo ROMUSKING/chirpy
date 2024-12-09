@@ -22,18 +22,18 @@ func main() {
 
 	secret := os.Getenv("SECRET")
 
-	mux := http.NewServeMux()
-	s := &http.Server{
-		Addr:           ":8080",
-		Handler:        mux,
-		MaxHeaderBytes: 1 << 20,
-	}
 	apiCfg := apiConfig{
 		db:       database.New(db),
 		platform: platform,
 		secret:   secret,
 	}
 
+	mux := http.NewServeMux()
+	s := &http.Server{
+		Addr:           ":8080",
+		Handler:        mux,
+		MaxHeaderBytes: 1 << 20,
+	}
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 
 	mux.HandleFunc("GET /admin/metrics", apiCfg.middlewareMetricsDsp)
@@ -56,7 +56,11 @@ func main() {
 
 	mux.HandleFunc("GET /api/chirps", apiCfg.getAllChirps)
 
+	mux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.deleteAChirp)
+
 	mux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.getOneChirp)
+
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.makeUserRed)
 
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(
 		http.StripPrefix(

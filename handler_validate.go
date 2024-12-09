@@ -27,7 +27,7 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	restpondWithJSON(w, http.StatusOK, returnVals{
+	respondWithJSON(w, http.StatusOK, returnVals{
 		CleanedBody: filterProfane(params.Body),
 	})
 }

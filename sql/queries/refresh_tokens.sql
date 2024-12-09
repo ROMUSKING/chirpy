@@ -21,10 +21,9 @@ WHERE token = $1;
 
 
  
--- name: RevokeRefreshToken :one
+-- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens SET (updated_at, revoked_at) = (NOW(), NOW())
-WHERE token = $1
-RETURNING expires_at;
+WHERE token = $1;
 
 
  

@@ -17,6 +17,7 @@ type User struct {
 	Email        string    `json:"email"`
 	Token        string    `json:"token"`
 	RefreshToken string    `json:"refresh_token"`
+	IsChirpyRed  bool      `json:"is_chirpy_red"`
 }
 
 func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
@@ -49,18 +50,20 @@ func (cfg *apiConfig) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := User{
-		ID:        userDB.ID,
-		CreatedAt: userDB.CreatedAt,
-		UpdatedAt: userDB.UpdatedAt,
-		Email:     userDB.Email,
+		ID:          userDB.ID,
+		CreatedAt:   userDB.CreatedAt,
+		UpdatedAt:   userDB.UpdatedAt,
+		Email:       userDB.Email,
+		IsChirpyRed: userDB.IsChirpyRed.Bool,
 	}
-	restpondWithJSON(w, 201, user)
+	respondWithJSON(w, 201, user)
 
 }
 
 func (cfg *apiConfig) resetUserDB(w http.ResponseWriter, req *http.Request) {
 	if cfg.platform != "dev" {
 		respondWithError(w, http.StatusForbidden, "Can't remove all users", nil)
+		return
 	}
 	err := cfg.db.DeleteAllUsers(req.Context())
 	if err != nil {
@@ -138,66 +141,10 @@ func (cfg *apiConfig) loginUser(w http.ResponseWriter, r *http.Request) {
 		Email:        userDB.Email,
 		Token:        token,
 		RefreshToken: refreshToken,
+		IsChirpyRed:  userDB.IsChirpyRed.Bool,
 	}
-	restpondWithJSON(w, http.StatusOK, user)
+	respondWithJSON(w, http.StatusOK, user)
 
-}
-
-func (cfg *apiConfig) refreshToken(w http.ResponseWriter, r *http.Request) {
-
-	type parameters struct {
-		Token string `json:"token"`
-	}
-
-	refreshToken, err := auth.GetBearerToken(r.Header)
-
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid token", err)
-		return
-	}
-
-	tokenDB, err := cfg.db.GetUserFromRefreshToken(r.Context(), refreshToken)
-
-	if err != nil || tokenDB.RevokedAt.Valid || time.Now().After(tokenDB.ExpiresAt) {
-		respondWithError(w, http.StatusUnauthorized, "invalid token", err)
-		return
-	}
-
-	const hour int = 3600 * 1000000000
-
-	token, err := auth.MakeJWT(
-		tokenDB.UserID,
-		cfg.secret,
-		time.Duration(hour))
-
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Can't create token.", err)
-		return
-	}
-
-	params := parameters{Token: token}
-
-	restpondWithJSON(w, http.StatusOK, params)
-
-}
-
-func (cfg *apiConfig) revokeRefreshToken(w http.ResponseWriter, r *http.Request) {
-
-	refreshToken, err := auth.GetBearerToken(r.Header)
-
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "invalid token", err)
-		return
-	}
-
-	_, err = cfg.db.RevokeRefreshToken(r.Context(), refreshToken)
-
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "couldn't revoke token", err)
-		return
-	}
-
-	restpondWithJSON(w, http.StatusNoContent, "")
 }
 
 func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
@@ -246,11 +193,42 @@ func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := User{
-		ID:        userDB.ID,
-		CreatedAt: userDB.CreatedAt,
-		UpdatedAt: userDB.UpdatedAt,
-		Email:     userDB.Email,
+		ID:          userDB.ID,
+		CreatedAt:   userDB.CreatedAt,
+		UpdatedAt:   userDB.UpdatedAt,
+		Email:       userDB.Email,
+		IsChirpyRed: userDB.IsChirpyRed.Bool,
 	}
-	restpondWithJSON(w, http.StatusOK, user)
+	respondWithJSON(w, http.StatusOK, user)
+
+}
+
+func (cfg *apiConfig) makeUserRed(w http.ResponseWriter, r *http.Request) {
+
+	type data struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+	type parameters struct {
+		Event string `json:"event"`
+		Data  data   `json:"data"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "No identifiable data", err)
+		return
+	}
+	if params.Event == "user.upgraded" {
+		_, err = cfg.db.MakeUserRed(r.Context(), params.Data.UserID)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "User doesn't exist.", err)
+			return
+		}
+
+	}
+
+	respondWithJSON(w, http.StatusNoContent, "")
 
 }

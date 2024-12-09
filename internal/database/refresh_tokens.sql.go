@@ -68,15 +68,12 @@ func (q *Queries) GetUserFromRefreshToken(ctx context.Context, token string) (Re
 	return i, err
 }
 
-const revokeRefreshToken = `-- name: RevokeRefreshToken :one
+const revokeRefreshToken = `-- name: RevokeRefreshToken :exec
 UPDATE refresh_tokens SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE token = $1
-RETURNING expires_at
 `
 
-func (q *Queries) RevokeRefreshToken(ctx context.Context, token string) (time.Time, error) {
-	row := q.db.QueryRowContext(ctx, revokeRefreshToken, token)
-	var expires_at time.Time
-	err := row.Scan(&expires_at)
-	return expires_at, err
+func (q *Queries) RevokeRefreshToken(ctx context.Context, token string) error {
+	_, err := q.db.ExecContext(ctx, revokeRefreshToken, token)
+	return err
 }

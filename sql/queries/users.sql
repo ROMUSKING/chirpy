@@ -21,3 +21,8 @@ RETURNING *;
 -- name: DeleteAllUsers :exec
 DELETE FROM users;    
 
+
+-- name: MakeUserRed :one
+UPDATE users SET (is_chirpy_red, updated_at) = (true, NOW())
+WHERE id = $1
+RETURNING *;

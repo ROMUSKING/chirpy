@@ -61,7 +61,7 @@ func (cfg *apiConfig) createChirp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	chirp := chirpDBToChirpJSON(chirpDB)
-	restpondWithJSON(w, 201, chirp)
+	respondWithJSON(w, 201, chirp)
 
 }
 
@@ -97,7 +97,7 @@ func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 		chirps[i] = chirpDBToChirpJSON(chirpDB)
 
 	}
-	restpondWithJSON(w, 200, chirps)
+	respondWithJSON(w, 200, chirps)
 }
 
 func chirpDBToChirpJSON(chirpDB database.Chirp) Chirp {
@@ -122,10 +122,53 @@ func (cfg *apiConfig) getOneChirp(w http.ResponseWriter, r *http.Request) {
 
 	chirpInDB, err := cfg.db.GetOneChirp(r.Context(), chirpID)
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldn't get chirp, wrong UUID.", err)
+		respondWithError(w, http.StatusNotFound, "Chirp doesn't exist.", err)
 		return
 	}
+
 	chirp := chirpDBToChirpJSON(chirpInDB)
 
-	restpondWithJSON(w, 200, chirp)
+	respondWithJSON(w, 200, chirp)
+}
+
+func (cfg *apiConfig) deleteAChirp(w http.ResponseWriter, r *http.Request) {
+
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "no auth token in request", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.secret)
+
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "invalid token in request", err)
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't delete chirp, wrong UUID.", err)
+		return
+	}
+
+	chirpInDB, err := cfg.db.GetOneChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusNotFound, "Chirp doesn't exist.", err)
+		return
+	}
+
+	if userID != chirpInDB.UserID {
+		respondWithError(w, http.StatusForbidden, "Not yours, can't delete", err)
+		return
+	}
+
+	err = cfg.db.DeleteAChirp(r.Context(), chirpID)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't delete chir.", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusNoContent, "")
 }

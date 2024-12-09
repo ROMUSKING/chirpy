@@ -16,12 +16,12 @@ func respondWithError(w http.ResponseWriter, code int, msg string, err error) {
 	type errorResponse struct {
 		Error string `json:"error"`
 	}
-	restpondWithJSON(w, code, errorResponse{
+	respondWithJSON(w, code, errorResponse{
 		Error: msg,
 	})
 }
 
-func restpondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	dat, err := json.Marshal(payload)
 	if err != nil {
