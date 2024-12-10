@@ -86,11 +86,26 @@ func filterProfane(msg string) string {
 }
 
 func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
-
-	chirpsInDB, err := cfg.db.GetAllChirps(r.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirp, database error.", err)
-		return
+	s := r.URL.Query().Get("author_id")
+	var chirpsInDB []database.Chirp
+	var err error
+	if s == "" {
+		chirpsInDB, err = cfg.db.GetAllChirps(r.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps, database error.", err)
+			return
+		}
+	} else {
+		authorID, err := uuid.Parse(s)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "Couldn't get chirps, autor unknown.", err)
+			return
+		}
+		chirpsInDB, err = cfg.db.GetAllChirpsByAuthor(r.Context(), authorID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps, database error.", err)
+			return
+		}
 	}
 	chirps := make([]Chirp, len(chirpsInDB))
 	for i, chirpDB := range chirpsInDB {
@@ -98,6 +113,7 @@ func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 
 	}
 	respondWithJSON(w, 200, chirps)
+
 }
 
 func chirpDBToChirpJSON(chirpDB database.Chirp) Chirp {

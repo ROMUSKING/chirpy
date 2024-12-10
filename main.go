@@ -22,10 +22,13 @@ func main() {
 
 	secret := os.Getenv("SECRET")
 
+	polkaKey := os.Getenv("POLKA_KEY")
+
 	apiCfg := apiConfig{
 		db:       database.New(db),
 		platform: platform,
 		secret:   secret,
+		polkaKey: polkaKey,
 	}
 
 	mux := http.NewServeMux()

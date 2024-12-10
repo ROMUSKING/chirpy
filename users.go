@@ -204,6 +204,12 @@ func (cfg *apiConfig) updateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) makeUserRed(w http.ResponseWriter, r *http.Request) {
+	apiKey, err := auth.GetAPIKey(r.Header)
+
+	if err != nil || apiKey != cfg.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Can't authenticate", err)
+		return
+	}
 
 	type data struct {
 		UserID uuid.UUID `json:"user_id"`
@@ -215,7 +221,7 @@ func (cfg *apiConfig) makeUserRed(w http.ResponseWriter, r *http.Request) {
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "No identifiable data", err)
 		return
