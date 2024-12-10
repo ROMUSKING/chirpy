@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -86,17 +87,19 @@ func filterProfane(msg string) string {
 }
 
 func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
-	s := r.URL.Query().Get("author_id")
+	author := r.URL.Query().Get("author_id")
+	sort := r.URL.Query().Get("sort")
+
 	var chirpsInDB []database.Chirp
 	var err error
-	if s == "" {
+	if author == "" {
 		chirpsInDB, err = cfg.db.GetAllChirps(r.Context())
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps, database error.", err)
 			return
 		}
 	} else {
-		authorID, err := uuid.Parse(s)
+		authorID, err := uuid.Parse(author)
 		if err != nil {
 			respondWithError(w, http.StatusNotFound, "Couldn't get chirps, autor unknown.", err)
 			return
@@ -111,6 +114,9 @@ func (cfg *apiConfig) getAllChirps(w http.ResponseWriter, r *http.Request) {
 	for i, chirpDB := range chirpsInDB {
 		chirps[i] = chirpDBToChirpJSON(chirpDB)
 
+	}
+	if sort == "desc" {
+		slices.Reverse(chirps)
 	}
 	respondWithJSON(w, 200, chirps)
 
